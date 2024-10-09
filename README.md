@@ -36,13 +36,12 @@ scripts/: Includes the R scripts used for data preprocessing, topic modeling, an
 results/: Contains the LDA model results, visualizations, and sentiment analysis outputs in poster format.
 README.md: This file, providing an overview of the project and its contents.
 ## Tools & Libraries Used
-
-R programming language
-`twarc2` (for data collection)
-`tidyverse`, `quanteda`, `tidytext`, `text2vec` (for data preprocessing and text analysis)
-`LDAvis` (for topic modeling visualization)
-`textstem` (for lemmatization)
-`syuzhet` (for sentiment analysis)
+-R programming language
+-`twarc2` (for data collection)
+-`tidyverse`, `quanteda`, `tidytext`, `text2vec` (for data preprocessing and text analysis)
+-`LDAvis` (for topic modeling visualization)
+-`textstem` (for lemmatization)
+-`syuzhet` (for sentiment analysis)
 ## Instructions for Running the Project
 
 Clone the repository.
