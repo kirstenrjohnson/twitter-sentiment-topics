@@ -1,0 +1,292 @@
+---
+title: "Twitter Topic Modeling and Sentiment Analysis"
+author: "Kirsten Johnson"
+date: "12/15/2022"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-copy: true
+    code-tools: true
+categories:
+  - Blog post 6 
+  - Twitter
+  - MassDOT
+  - Topic Modeling
+  - LDA
+---
+
+I am conducting an analysis of tweets mentioning MassDOT, as I work on social media for the agency as part of my job. With the MBTA GM stepping down in early November and the agency under scrutiny over the past few weeks due to public dissatisfaction with the public system in Massachusetts, I'm interested if a negative sentiment can be identified towards MassDOT. Though MBTA and MassDOT are two different agencies, they work in tandem and the work of both are often conflated with each other by the public. My goals are as follows:
+
+1. Identify frequent topics that are discussed when MassDOT is mentioned that could inform ways in which to improve MassDOT's current social media strategy.
+2. Analyze how top topics relate to each other to gain broader insight into the discourse surrounding MassDOT on Twitter. 
+3. Determine overall sentiment of topics related to MassDOT.
+
+I decided to look at tweets in particular since MassDOT's primary social media presence is on Twitter. I was able to gathered tweets from the past month that mention MassDOT on Twitter using the twarc2 package in Python. The goal is to capture the public's attitude towards the agency and traffic safety culture. These tweets have been saved to a CSV file.
+
+### Preprocessing 
+
+I'll be including preprocessing steps similar to that of Hidayatullah & Ma’arif (2019). I will be removing unnecessary characters from the tweets, such as usernames, punctuation, numbers, URLs, and special characters. I will also be changing the case from upper to lower, filtering out hashtags, remove tweets with less than 3 words and create a unique ID for my tweets. I'll tokenize and remove english stopwords. In a separate script, I will create visualizations to further explore the data.
+
+```{r}
+#| label: setup
+#| warning: false
+
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#install packages if not already installed
+packages <- c("cleanNLP", "devtools", "tidytext", "plyr", "tidyverse", "quanteda", "wordcloud", "syuzhet","wordcloud2", "text2vec")
+install.packages(setdiff(packages, rownames(installed.packages())))
+
+# load libraries
+
+library(cleanNLP)
+library(tidytext)
+library(tidyverse)
+library(quanteda)
+library(plyr)
+library(dplyr)
+library(devtools)
+library(tidyverse)
+library(stringr)
+library(readr)
+library(text2vec)
+
+
+# Combine tweets into one dataframe
+tweets_folder <- "../MassDOT_Tweets"
+massdot_tweets <- list.files(path = tweets_folder, pattern = "*.csv", full.names = TRUE) %>%
+  read_csv() %>%
+  bind_rows
+massdot_tweets
+```
+
+
+```{r}
+#Subset data to only include relevant fields
+#Filter out tweets from @MassDOT or @MassDOTSafey
+massdot_tweets<- massdot_tweets %>%
+filter(author.username != "MassDOT")%>%
+filter(author.username != "MassDOTSafety") %>%
+  select(text)
+# Remove Retweets
+massdot_tweets<-massdot_tweets %>% 
+  distinct(text, .keep_all = TRUE)
+
+```
+
+
+
+```{r}
+
+#Convert text to lowercase
+massdot_tweets$text <- tolower(massdot_tweets$text)
+
+# Filter out necessary characters
+# Remove Twitter username mentions
+massdot_tweets$text = gsub("@[[:alpha:]]*","", massdot_tweets$text)
+#Remove hashtags 
+massdot_tweets$text = sub("(?:\\s*#\\w+)+\\s*$", "", massdot_tweets$text)
+massdot_tweets$text = sub("rt", "", massdot_tweets$text)
+
+# Remove punctuation
+massdot_tweets$text = gsub("[[:punct:]]", "", massdot_tweets$text)
+# Remove numbers
+massdot_tweets$text = gsub("[[:digit:]]", "", massdot_tweets$text)
+#Remove URLs
+massdot_tweets$text = gsub("http\\w+", "", massdot_tweets$text)
+
+massdot_tweets
+```
+
+
+```{r}
+#Remove URLs
+massdot_tweets$text = str_replace_all(massdot_tweets$text," "," ")
+massdot_tweets  
+
+#Remove records less than 3 words
+massdot_tweets<-massdot_tweets[sapply(strsplit(as.character(massdot_tweets$text)," "),length)>4,]
+
+massdot_tweets$text = sub(" amp ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" n ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" o ", "", massdot_tweets$text)
+massdot_tweets$text = sub("", "", massdot_tweets$text)
+massdot_tweets$text = sub(" ma  ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" massdot  ", "", massdot_tweets$text)
+# Remove Stop Words
+stopword<-(stopwords("en"))
+stopword2 <- paste0("\\b", stopword, "\\b")
+stopword3 <- paste(stopword2, collapse = "|")
+massdot_tweets$text = gsub(pattern = stopword3, replacement = " ", x = massdot_tweets$text, ignore.case = TRUE)
+```
+
+
+
+
+```{r}
+#Create unique ID
+massdot_tweets$textID<-1:nrow(massdot_tweets)
+head(massdot_tweets)
+
+
+# Lemmatize tweet text
+library(textstem)
+vector <- (massdot_tweets$text)
+massdot_tweets$text<- lemmatize_strings(vector)
+head(massdot_tweets)
+massdot_tweets$text = sub(" amp ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" n ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" o ", "", massdot_tweets$text)
+massdot_tweets$text = sub("", "", massdot_tweets$text)
+massdot_tweets$text = sub(" ma  ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" massdot  ", "", massdot_tweets$text)
+
+# Create corpus
+massdot_tweets_corpus <-corpus(massdot_tweets)
+
+
+#Tokenize and remove stopwords
+massdot_tweets_tokens <- quanteda::tokens(massdot_tweets_corpus)
+massdot_tweets_tokens<- tokens_select(massdot_tweets_tokens, pattern = stopwords("en"), selection = "remove")
+```
+### LDA Modeling  
+
+For my topic models, I am going to try a few different iterations. First, lets create our tokens and iterator.  
+
+
+```{r}
+# Create iterator over each token
+tokens <- word_tokenizer(massdot_tweets_corpus)
+it <- itoken(tokens, ids = massdot_tweets$textID, progressbar = FALSE)
+
+# Build the vocabulary
+v <- create_vocabulary(it)
+
+```
+
+Now, I'll prune my vocabulary to include words that are mentioned in my corpus a minimum of 10 times.
+```{r}
+v <- prune_vocabulary(v, term_count_min = 10, doc_proportion_max = 0.2)
+v
+```
+
+Now I'll create a document feature matrix.  
+
+```{r}
+# Vectorize tokens list
+vectorizer <- vocab_vectorizer(v)
+# Create document term matrix
+
+dtm <- create_dtm(it, vectorizer, type = "dgTMatrix")
+dtm 
+```
+
+Now I'm ready to start modeling my data. Since my corpus is so small, I'm inclined to think that less topics will be better. Still, I will try out models with 4, 5, 6, 7 and 8 topics.
+
+```{r}
+library(LDAvis)
+# Create topic models with 4 topics
+lda_model3 <- LDA$new(n_topics = 3, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr3 <- 
+  lda_model3$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25, 
+                          progressbar = FALSE)
+# Create topic models with 4 topics
+lda_model4 <- LDA$new(n_topics = 4, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr4 <- 
+  lda_model4$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25, 
+                          progressbar = FALSE)
+# Create topic models with 5 topics
+lda_model5 <- LDA$new(n_topics = 5, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr5 <- 
+  lda_model5$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25,
+                          progressbar = FALSE)
+# Create topic models with 6 topics
+lda_model6 <- LDA$new(n_topics = 6, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr6 <- 
+  lda_model6$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25,
+                          progressbar = FALSE)
+# Create topic models with 7 topics
+lda_model7 <- LDA$new(n_topics = 7, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr7 <- 
+  lda_model7$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25,
+                          progressbar = FALSE)
+# Create topic models with 8 topics
+lda_model8 <- LDA$new(n_topics = 8, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+doc_topic_distr8 <- 
+  lda_model8$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001,
+                          n_check_convergence = 25,
+                          progressbar = FALSE)
+```
+
+Now that my 5 models are created, I'll look at the top words in each topic for each model. I'll use a lambda of 0.2.  
+
+
+
+```{r}
+# get top 10 words for model with 4 topics
+lda_model4$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L),lambda = .2)
+```
+
+
+```{r}
+# get top 10 words for model with 5 topics
+lda_model5$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L,5L),lambda = .2)
+```
+
+
+```{r}
+# get top 10 words for model with 6 topics
+lda_model6$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L,5L,6L),lambda = .2)
+```
+
+
+
+
+```{r}
+# get top 10 words for model with 7 topics
+lda_model7$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L,5L,6L,7L),lambda = .2)
+
+```
+
+```{r}
+# get top 10 words for model with 8 topics
+lda_model8$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L,5L,6L,7L,8L),lambda = .2)
+```
+
+Out of all of the models, I think the model with 5 topics is the best. Each topic is distinct but not too specific. Let's take a closer look and create a plot.
+
+```{r}
+# get top 10 words for model with 5 topics
+lda_model5$get_top_words(n = 10, topic_number = c(1L,2L,3L,4L,5L),lambda = .2)
+```
+
+```{r}
+# creating plot
+lda_model5$plot()
+```
+
+When viewing the plot, I adjusted the lambda in the plot to be 0.3. While some tokens aren't actual words, I can infer what the word likely would be in cases where a token is  a letter off.
+

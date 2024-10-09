@@ -1,0 +1,332 @@
+---
+title: "Senitment Visualizations and Network Analysis"
+author: "Kirsten Johnson"
+date: "12/1/2022"
+format:
+  html:
+    toc: true
+    toc-depth: 3 
+    code-fold: true
+    code-copy: true
+    code-tools: true
+categories:
+  - Blog post 5 
+  - Twitter
+  - MassDOT
+  - Visualization
+  - Network Analysis
+---
+```{r}
+#| label: setup
+#| warning: false
+
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+I want to test out different word clouds, bar charts, and other visualizations to better interpret my analyses so far. Let's run the preprossing script:  
+
+
+```{r}
+#install packages if not already installed
+packages <- c("cleanNLP", "devtools", "tidytext", "plyr", "tidyverse", "quanteda", "wordcloud", "syuzhet","wordcloud2")
+install.packages(setdiff(packages, rownames(installed.packages())))
+
+# load libraries
+library(cleanNLP)
+library(tidytext)
+library(tidyverse)
+library(quanteda)
+library(plyr)
+library(dplyr)
+library(devtools)
+library(tidyverse)
+library(stringr)
+library(readr)
+
+
+# Combine tweets into one dataframe
+tweets_folder <- "../MassDOT_Tweets"
+massdot_tweets <- list.files(path = tweets_folder, pattern = "*.csv", full.names = TRUE) %>%
+  read_csv() %>%
+  bind_rows
+head(massdot_tweets)
+```
+
+
+
+```{r}
+#Subset data to only include relevant fields
+#Filter out tweets from @MassDOT or @MassDOTSafey
+massdot_tweets<- massdot_tweets %>%
+filter(author.username != "MassDOT")%>%
+filter(author.username != "MassDOTSafety") %>%
+select(text)
+# Remove Retweets
+massdot_tweets<-massdot_tweets %>% distinct(text, .keep_all = TRUE)
+
+#Convert text to lowercase
+massdot_tweets$text <- tolower(massdot_tweets$text)
+
+# Remove Stop Words
+stopword<-(stopwords("en"))
+stopword2 <- paste0("\\b", stopword, "\\b")
+stopword3 <- paste(stopword2, collapse = "|")
+massdot_tweets$text <- gsub(pattern = stopword3, replacement = " ", x = massdot_tweets$text, ignore.case = TRUE)
+
+#Convert text to lowercase
+massdot_tweets$text <- tolower(massdot_tweets$text)
+# Filter out necessary characters
+# Remove Twitter username mentions
+massdot_tweets$text = gsub("@[[:alpha:]]*","", massdot_tweets$text)
+#Remove hashtags 
+massdot_tweets$text = sub("(?:\\s*#\\w+)+\\s*$", "", massdot_tweets$text)
+massdot_tweets$text = sub("rt", "", massdot_tweets$text)
+# Remove punctuation
+massdot_tweets$text = gsub("[[:punct:]]", "", massdot_tweets$text)
+# Remove numbers
+massdot_tweets$text = gsub("[[:digit:]]", "", massdot_tweets$text)
+#Remove URLs
+massdot_tweets$text = gsub("http\\w+", "", massdot_tweets$text) #Remove URLs
+massdot_tweets$text = str_replace_all(massdot_tweets$text," "," ")
+```
+
+```{r}
+#Remove records less than 3 words, get rid of other outliers
+massdot_tweets<- massdot_tweets[sapply(strsplit(as.character(massdot_tweets$text)," "),length)>4,]
+
+
+#Create unique ID
+massdot_tweets$textID<-1:nrow(massdot_tweets)
+print(massdot_tweets)
+```
+
+```{r}
+# Lemmatize tweets
+library(textstem)
+vector <- (massdot_tweets$text)
+massdot_tweets$text<- lemmatize_strings(vector)
+
+massdot_tweets$text = sub(" amp ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" n ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" o ", "", massdot_tweets$text)
+massdot_tweets$text = sub("", "", massdot_tweets$text)
+massdot_tweets$text = sub(" ma  ", "", massdot_tweets$text)
+massdot_tweets$text = sub(" massdot  ", "", massdot_tweets$text)
+massdot_tweets
+```
+
+```{r}
+#Create corpus
+massdot_tweets_corpus <-corpus(massdot_tweets)
+#Tokenize and remove stopwords
+massdot_tweets_tokens <- quanteda::tokens(massdot_tweets_corpus)
+massdot_tweets_tokens<- tokens_select(massdot_tweets_tokens, pattern = stopwords("en"), selection = "remove")
+
+massdot_tweets_dfm<-dfm(massdot_tweets_tokens)
+print(massdot_tweets_tokens)
+```
+
+### Testing Visualizations
+
+#### Corpus Word Frequency
+
+First, I want to visualize the top unigrams in my corpus using a word cloud after initial preprocessing. Let's get the 75 most frequently used words in my corpus.
+
+```{r}
+#Identify top 75 words in corpus
+
+topWords<-topfeatures(massdot_tweets_dfm, 75)
+topWords <- data.frame(topWords)
+topWords["unigram"] <- rownames(topWords)
+topWords<-topWords[,c (2,1)]
+topWords <- topWords[-1,]
+print(topWords)
+```
+
+Now I'll try a word cloud.
+
+```{r}
+
+library(wordcloud)
+set.seed(1234)
+hw<-wordcloud(words = topWords$unigram, freq = topWords$topWords, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
+```
+
+I do like this, but I'd like to try out a blue color gradient, since Twitter is typically associated with a blue color pallete.  
+
+```{r}
+#Create wordcloud with color gradient
+library(wordcloud2)
+n <- ceiling(nrow(topWords)/3)
+
+col <-
+  sapply(sapply(seq(
+    from = 1, to = 0.25, by = -0.25
+  ), rep, n), function(x)
+    adjustcolor("#1F78B4", x))
+
+
+wordcloud2(topWords, color = col,size = 1.5, minRotation = 0, maxRotation = 0, rotateRatio = 1)
+
+
+```
+
+
+#### Visualizing Sentiment
+
+I want to test out a few visualizations of my sentiment analysis that I started in my last blog post using the Bing lexicon. First, I want to understand what words from the Bing lexicon are used the most frequently in my corpus.  
+```{r}
+#Join Bing lexicon to corpus
+library(tidytext)
+bingtweets<- massdot_tweets %>%
+  unnest_tokens(word, text) 
+
+bing <- get_sentiments( "bing" ) %>% 
+  filter(word!="rail")
+bingtweetssentiment <- bingtweets %>%
+  full_join(bing)%>%
+  group_by(textID, sentiment)%>%
+  dplyr::count(sentiment)%>%
+  spread(sentiment, n)%>%
+  replace(is.na(.), 0)
+
+bingtweetssentiment
+```
+
+Let's start by taking a look at the most frequent Bing lexicon words used in my corpus:  
+
+```{r}
+# View top positive and negative Bing words that contribute to corpus sentiment
+bingtweetsTopWords <- bingtweets %>%
+  inner_join( bing) %>%
+  dplyr::count(word, sentiment, sort = TRUE )
+bingtweetsTopWords
+```
+
+Using a word cloud, I can convey the frequency of words use by using size. I'll create a comparison word cloud of the positive and negative words use in my corpus.
+
+```{r}
+# Get wordcloud of top positive and negative sentiment words using Bing lexicon
+library(reshape2)
+library(wordcloud)
+bingtweetscloud <- bingtweets %>%
+  inner_join(bing)%>%
+  group_by(textID,sentiment, word)%>%
+  dplyr::count(sentiment) %>% acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("indianred3","steelblue3"),
+                   max.words = 100)
+
+```
+I really like how this looks, especially because there aren't any words that look out of place here. Let's look at the top 10 positive and negative words in using a bar chart.
+
+```{r}
+# Create bar chart of top positive and negative sentiment words using Bing lexicon
+bingtweetsbar <-bingtweetsTopWords %>% 
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = TRUE) +
+  labs(x = "Contribution to sentiment",
+       y = "Top Words")
+bingtweetsbar 
+```
+
+What I like about this version is that the positive and negative words are shown all together and in order of their frequency in the corpus. But I think these would be easier to visualize in separate graphs.
+
+```{r}
+# Create side by side bar chart of top positive and negative sentiment words using Bing lexicon
+bingtweetsbar <-bingtweetsTopWords %>% 
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to Sentiment",
+       y = "Top Words (Bing Lexicon)")
+bingtweetsbar 
+```
+
+This version is much easier to look at! Now I want to start visualizing polarity scores.
+
+#### Polarity Visualizations  
+
+In my last post, I created the following polarity graph.  
+
+```{r}
+# Get Polarity
+bingtweetssentiment$polarity <- (bingtweetssentiment$positive - bingtweetssentiment$negative)/(bingtweetssentiment$positive + bingtweetssentiment$negative)
+
+bingtweetssentiment$polarity[(bingtweetssentiment$positive + bingtweetssentiment$negative) == 0] <- 0
+
+ggplot(bingtweetssentiment) +
+  geom_histogram(aes(x=polarity)) +
+  theme_bw()
+```
+
+This one is pretty boring. Let's try a different bar chart:  
+
+```{r}
+# create bar chart of polarity score distribution
+library(ggeasy)
+  ggplot(bingtweetssentiment)+(aes(x=polarity)) + 
+  geom_histogram(binwidth = .25, fill = "lightblue")+ 
+  ylab("Tweet Count") + 
+  xlab("Polarity Score") +
+  ggtitle("Distribution of polarity using Bing Lexicon") +
+  ggeasy::easy_center_title()
+```
+
+Ok, already looks much better. Let's try out a histogram:  
+
+```{r}
+# Create histogram of polarity score
+hist(bingtweetssentiment$polarity,
+     xlab = "Polarity",
+     ylab = "Tweet Count",
+     main = "Sentiment Distribution (Bing Lexicon)",
+     col = "steelblue")
+```
+
+The histogram looks nice and clean. I'm leaning towards using this one in my final poster.
+
+```{r}
+massdot_tweets_dfm
+```
+
+
+#### Semantic Network Analysis  
+
+I'd like to see what words co-occur in my corpus. I'll create a feature co-occurance matrix for words used at least 40 times and create a network textplot.  
+
+```{r}
+# create fcm from dfm of words that appear in corpus at least 40 times
+massdot_tweets_dfm_small<- dfm_trim((massdot_tweets_dfm), min_termfreq = 40)
+massdot_tweets_dfm_small
+massdot_tweets_fcm <- fcm(massdot_tweets_dfm_small)
+massdot_tweets_fcm
+```
+
+```{r}
+library(quanteda.textplots)
+# Create semantic network textplot
+size <- log(colSums(massdot_tweets_fcm))
+textplot_network(massdot_tweets_fcm, vertex_size = size / max(size) * 3)
+```
+This visualization gives a lot of information. Some of the main topics I took away are:
+1. News, crash, death, and ma are likely related to reporting crashes in Massachusetts
+2. Design, project, public, and meet likely allude to public meetings.
+3. Thanksgiving, busy, open, and time could point to travel advisories.
+4. Route, bike, bus may be referencing multimodal transportation.
+
+
+
