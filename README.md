@@ -14,7 +14,7 @@
     <li>
       <a href="#project-details">Project Details</a>
       <ul>
-        <li><a href="#tools amp-libraries-used">Tools & Libraries Used</a></li>
+        <li><a href="#tools-and-libraries-used">Tools and Libraries Used</a></li>
         <li><a href="#data-collection">Data Collection</a></li>
         <li><a href="#preprocessing-steps">PreprocessingSteps</a></li>
         <li><a href="#topic-modeling">Topic Modeling</a></li>
@@ -48,7 +48,7 @@ Determine the sentiment surrounding these topics.
 
 # Project Details  
 
-### Tools & Libraries Used
+### Tools and Libraries Used
 * R programming language
 * `twarc2` (for data collection)
 * `tidyverse`, `quanteda`, `tidytext`, `text2vec` (for data preprocessing and text analysis)
@@ -68,6 +68,7 @@ To prepare the data for analysis, the following preprocessing steps were conduct
 * Removal of tweets with fewer than 3 words.
 * Lemmatization of words to their root forms.
 * Tokenization and removal of stopwords.
+  
 ### Topic Modeling
 
 Latent Dirichlet Allocation (LDA) was used to model the topics within the tweets. I experimented with different models ranging from 4 to 8 topics. The model with 5 topics was selected as the most optimal, providing distinct yet meaningful topic groupings.
