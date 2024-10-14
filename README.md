@@ -5,7 +5,7 @@ This project conducts topic modeling and sentiment analysis on tweets mentioning
 
 Although the MBTA and MassDOT are separate agencies, they are often conflated in public discourse. By analyzing Twitter data, I aim to identify frequent topics, understand how these topics relate to one another, and determine the overall sentiment expressed in these discussions.
 
-## Goals: 
+## Goals
 
 Identify frequent topics related to MassDOT on Twitter.
 Analyze the relationship between these topics to gain insight into public discourse.
