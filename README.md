@@ -1,17 +1,47 @@
-# twitter-sentiment-topics
-## Project Overview
+<a id="readme-top"></a>
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#goals">Goals</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#data-collection">Data Collection</a>
+      <ul>
+        <li><a href="#preprocessing-steps">PreprocessingSteps</a></li>
+        <li><a href="#topic-modeling">Topic Modeling</a></li>
+         <li><a href="#topic-modeling">Topic Modeling</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+# About the Project
 
 This project conducts topic modeling and sentiment analysis on tweets mentioning MassDOT, the Massachusetts Department of Transportation. With recent public dissatisfaction surrounding transportation in Massachusetts, particularly the MBTA, this analysis aims to explore whether a negative sentiment can be identified towards MassDOT and to provide insights into frequent topics related to the agency.
 
 Although the MBTA and MassDOT are separate agencies, they are often conflated in public discourse. By analyzing Twitter data, I aim to identify frequent topics, understand how these topics relate to one another, and determine the overall sentiment expressed in these discussions.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Goals
+### Goals
 
 Identify frequent topics related to MassDOT on Twitter.
 Analyze the relationship between these topics to gain insight into public discourse.
 Determine the sentiment surrounding these topics.
-## Data Collection
-I used the twarc2 package to scrape tweets mentioning MassDOT from the past month. These tweets were saved in a CSV format for further analysis.
+
+### Data Collection
+I used the twarc2 package to scrape tweets mentioning MassDOT from the past month (November 2022). These tweets were saved in a CSV format.
 
 ## Preprocessing Steps
 
