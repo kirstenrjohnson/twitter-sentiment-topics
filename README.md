@@ -14,7 +14,7 @@
     <li>
       <a href="#project-details">Project Details</a>
       <ul>
-        <li><a href="#tools-&-libraries-used">Tools & Libraries Used</a></li>
+        <li><a href="#tools-and-libraries-used">Tools & Libraries Used</a></li>
         <li><a href="#data-collection">Data Collection</a></li>
         <li><a href="#preprocessing-steps">PreprocessingSteps</a></li>
         <li><a href="#topic-modeling">Topic Modeling</a></li>
