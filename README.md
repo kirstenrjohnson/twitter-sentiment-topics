@@ -13,6 +13,7 @@
     </li>
     <li>
       <a href="#project-details">Project Details</a>
+      <ul>
         <li><a href="#tools-and-libraries-used">Tools and Libraries Used</a></li>
         <li><a href="#data-collection">Data Collection</a></li>
         <li><a href="#preprocessing-steps">PreprocessingSteps</a></li>
@@ -54,7 +55,7 @@ Determine the sentiment surrounding these topics.
 * `LDAvis` (for topic modeling visualization)
 * -`textstem` (for lemmatization)
 * -`syuzhet` (for sentiment analysis)
-* 
+  
 ### Data Collection
 I used the twarc2 package to scrape tweets mentioning MassDOT from the past month (November 2022). These tweets were saved in a CSV format.
 
